@@ -1,0 +1,243 @@
+<?php
+require_once '../../../common/configs/connect.php';
+require '../../../common/configs/constant.php';
+require_once '../../funcs/user_funcs.php';
+
+session_start();
+
+// Check isset session username
+if (empty($_SESSION['username'])) {
+    header('location: ../auth/login.php');
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'GET') {
+    // Get form data
+    $search = !empty($_GET['search']) ? trim($_GET['search']) : '';
+
+    $listUsers = getAllUsers($connection, $activeDelete);
+
+    // Pagination
+    $perPage = 10;
+    $allNum = count($listUsers);
+    $maxPage = ceil($allNum / $perPage);
+
+    if (!empty($_GET['page'])) {
+        $page = trim($_GET['page']);
+    } else {
+        $page = 1;
+        if ($page < 1 || $page > $maxPage) {
+            $page = 1;
+        }
+    }
+
+    $offset = ($page - 1) * $perPage;
+
+    if (!empty($search) && $search !== '') {
+        // Get all list users when search
+        $listAllUsers = searchUsers($connection, $search, $activeDelete, $offset, $perPage);
+    } else {
+        // Get all list users
+        $listAllUsers = getAllUserPagination($connection, $activeDelete, $offset, $perPage);
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<?php
+$pageTitle = 'List Users';
+
+require '../../common/header_lib.php';
+?>
+
+<body>
+    <?php require '../../common/navbar.php'; ?>
+
+    <?php require '../../common/menu.php'; ?>
+
+    <div class="main">
+        <div class="main-inner">
+            <div class="container">
+                <div class="row">
+                    <div class="span12">
+                        <div class="widget widget-table action-table">
+                            <div class="widget-header"> <i class="icon-user"></i>
+                                <h3>Users</h3>
+                            </div>
+                            <!-- /widget-header -->
+                            <br>
+                            <button class="btn btn-primary"><a href="./user_add.php" class="a-button"><i class="icon-plus"></i>&ensp;Add new user</a></button>
+                            <br><br>
+
+                            <?php require_once '../../common/search.php'; ?>
+
+                            <div class="widget-content">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th class="td-actions" style="width:5%;">No</th>
+                                            <th class="td-actions" style="width:20%;">Username</th>
+                                            <th class="td-actions" style="width:45%;">Email</th>
+                                            <th class="td-actions" style="width:20%;">Active</th>
+                                            <th colspan="2" class="td-actions" style="width:10%;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        if (count($listAllUsers) > 0) {
+                                            foreach ($listAllUsers as $listNumber => $listUser) {
+                                                if ($listUser['active'] == '0') {
+                                                    $listUser['active'] = '<i title="Inactive" class="icon-remove"></i>';
+                                                    $classActive = 'btn btn-danger';
+                                                } else {
+                                                    $listUser['active'] = '<i title="Inactive" class="icon-ok"></i>';
+                                                    $classActive = 'btn btn-success';
+                                                }
+
+                                                $numList = ($page - 1) * $perPage + $listNumber + 1;
+
+                                                echo '<tr>';
+                                                echo ' <td class="td-actions">' . $numList . '</td>';
+                                                echo ' <td>' . $listUser['username'] . '</td>';
+                                                echo ' <td>' . $listUser['email'] . '</td>';
+                                                echo ' <td class="td-actions"><div class="' . $classActive . '">' . $listUser['active'] . '</div></td>';
+
+                                                echo ' <td class="td-actions"><a title="Edit user" class="btn btn-warning" href="./user_edit.php?id=' . $listUser['id'] . '"><i class="icon-edit"></i></a></td>';
+                                                echo ' <td  class="td-actions"><button title="Delete user" data-id="' . $listUser['id'] . '" type="button" class="btn btn-danger deletebtn"><i class="icon-trash"></i></button></td>';
+                                                echo '</tr>';
+                                            }
+                                        } else {
+                                            echo '<td colspan="7" class="td-actions">No data displayed</td>';
+                                        }
+                                        ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- /widget-content -->
+                            <br>
+                            <button class="btn btn-primary pull-right"><a class="a-button" href="user_list_backup.php"><i class="icon-user"></i>&ensp;Deleted users</a></button>
+                        </div>
+                    </div>
+                    <!-- /span6 -->
+                </div>
+                <!-- /row -->
+                <div class="pull-right">
+                    <nav aria-label="Page navigation example">
+                        <ul class="pagination justify-content-center">
+                            <?php
+                            if ($page > 1) {
+                                $prevPage = $page - 1;
+                                if (empty($search)) {
+                                    echo '<li class="page-item">
+                                        <a class="page-link btn btn-invert" href="user_list.php?page=' . $prevPage . '">&laquo;</a>
+                                    </li>';
+                                } else {
+                                    echo '<li class="page-item">
+                                        <a class="page-link btn btn-invert" href="user_list.php?search=' . $search . '&page=' . $prevPage . '">&laquo;</a>
+                                    </li>';
+                                }
+                            }
+
+                            if (empty($search)) {
+                                for ($index = 1; $index <= $maxPage; $index++) {
+                                    if ($maxPage == 1 && $page = 1) {
+                                        echo '<li></li>';
+                                    } else { ?>
+                                        <li class="page-item <?php echo ($index == $page) ? 'active' : false; ?>">
+                                            <a class="page-link btn btn-invert" href="<?php echo 'user_list.php?page=' . $index; ?>">
+                                                <?php echo $index; ?>
+                                            </a>
+                                        </li>
+                                    <?php }
+                                }
+                            } else {
+                                $listAllUsers = countTotalSearch($connection, $search, $activeDelete);
+
+                                $allNum = count($listAllUsers);
+                                $maxPage = ceil($allNum / $perPage);
+
+                                for ($index = 1; $index <= $maxPage; $index++) {
+                                    if ($maxPage == 1 && $index == 1) {
+                                        echo '<li></li>';
+                                    } else { ?>
+                                        <li class="page-item <?php echo ($index == $page) ? 'active' : false; ?>">
+                                            <a class="page-link btn btn-invert" href="<?php echo 'user_list.php?search=' . $search . '&page=' . $index; ?>">
+                                                <?php echo $index; ?>
+                                            </a>
+                                        </li>
+
+                            <?php }
+                                }
+                            }
+
+                            $nextPage = $page + 1;
+                            if ($page < $maxPage) {
+                                if (!empty($search)) {
+                                    echo '<li class="page-item"><a class="page-link btn btn-invert" href="user_list.php?search=' . $search . '&page=' . $nextPage . '">&raquo;</a></li>';
+                                } else {
+                                    echo '<li class="page-item"><a class="page-link btn btn-invert" href="user_list.php?page=' . $nextPage . '">&raquo;</a></li>';
+                                }
+                            }
+                            ?>
+
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+            <!-- /container -->
+        </div>
+        <!-- /main-inner -->
+    </div>
+    <!-- /main -->
+
+    <!-- DELETE POP UP FORM -->
+    <div id="deletemodal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="exampleModelLabel" aria-hidden="true">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+            <h3 id="myModalLabel">Delete User</h3>
+        </div>
+        <form action="./user_delete.php" method="post">
+            <div class="modal-body">
+                <input type="hidden" name="delete_id" id="delete_id" value="<?php echo $listUser['id']; ?>">
+                <p>Do you want delete this user ?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
+                <button class="btn btn-danger">Delete</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- END DELETE POP UP FORM -->
+
+    <?php require '../../common/footer_top.php'; ?>
+
+    <?php require '../../common/footer_bottom.php'; ?>
+
+    <?php require '../../common/footer_lib.php'; ?>
+
+    <script>
+        $(document).ready(function() {
+            $('.deletebtn').on('click', function() {
+                $('#deletemodal').modal('show');
+
+                $tr = $(this).closest('tr');
+
+                let data = $tr.children("td").map(function() {
+                    return $(this);
+                });
+
+                let tr = data[5];
+                let dom = tr['context']['innerHTML'];
+
+                let replaced = dom.replace(/\D/g, '');
+
+                $('#delete_id').val(replaced);
+            });
+        });
+    </script>
+
+</body>
+
+</html>
